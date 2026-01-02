@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DroidRig - Curve Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tektur:wght@400..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/editor.css') }}">
+</head>
+<body>
+    <div class="app">
+        <header>
+            <div class="header-left">
+                <h1>DROIDRIG</h1>
+            </div>
+            <div class="header-center">
+                <button id="playPauseBtn" class="btn-square btn-success" onclick="previewAnimation()" title="Play"><span class="material-icons">play_arrow</span></button>
+                <button class="btn-square btn-danger" onclick="stopAnimation()" title="Stop"><span class="material-icons">stop</span></button>
+            </div>
+            <div class="header-right">
+                <div class="status" style="margin-right: 10px;">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Ready</span>
+                </div>
+                <button class="btn-square" onclick="saveConfig()" title="Save configuration"><span class="material-icons">save</span></button>
+            </div>
+        </header>
+        
+        <div class="toolbar">
+            <div class="tool-group">
+                <label>Grid Snap:</label>
+                <input type="checkbox" id="gridSnap" checked>
+            </div>
+            <div class="tool-group">
+                <label>Live Preview:</label>
+                <input type="checkbox" id="livePreview">
+            </div>
+            <div class="tool-group">
+                <button class="btn btn-small" onclick="clearAllCurves()">Clear all</button>
+            </div>
+            <div class="tool-group" style="margin-left: auto;">
+                <div class="servo-count-control">
+                    <span class="servo-count-label">Servos:</span>
+                    <button class="servo-count-btn" onclick="changeServoCount(-1)">−</button>
+                    <span id="servoCountDisplay" class="servo-count-value">{{ num_servos }}</span>
+                    <button class="servo-count-btn" onclick="changeServoCount(1)">+</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="editor-container">
+            <div class="timeline-ruler-row">
+                <div class="duration-control">
+                    <input type="number" id="duration" class="duration-input" value="3000" min="500" max="30000" step="100">
+                    <span class="duration-unit">ms</span>
+                </div>
+                <div class="ruler-container">
+                    <canvas id="rulerCanvas"></canvas>
+                </div>
+            </div>
+            <div class="annotation-row">
+                <div class="annotation-label">
+                    <span>NOTES</span>
+                </div>
+                <div class="annotation-container">
+                    <canvas id="annotationCanvas"></canvas>
+                </div>
+            </div>
+            <div class="tracks-scroll-area" id="tracksScrollArea">
+                <div class="servo-labels" id="servoLabels">
+                    <!-- Dynamically populated -->
+                </div>
+                <div class="tracks-container">
+                    <canvas id="tracksCanvas"></canvas>
+                    <div class="playhead" id="playhead"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div class="footer-info">
+                <span id="mouseInfo">-</span>
+                <span class="footer-hint" id="selectionHint"></span>
+            </div>
+            <div class="log-mini" id="log"></div>
+        </div>
+    </div>
+    
+    <!-- Annotation Popover -->
+    <div id="annotationPopover" class="annotation-popover">
+        <input type="text" id="annotationInput" class="annotation-input" placeholder="Add note...">
+        <button class="btn-add" onclick="confirmAnnotation()">Add</button>
+    </div>
+    <div id="annotationOverlay" class="annotation-overlay" onclick="cancelAnnotation()"></div>
+    
+    <!-- Servo Settings Modal -->
+    <div id="servoModal" class="modal" onclick="if(event.target===this)closeServoModal()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="modalTitle">SERVO SETTINGS</span>
+                <button class="modal-close" onclick="closeServoModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="modalChannel">
+                
+                <div class="form-group">
+                    <label for="servoName">Name / Alias</label>
+                    <input type="text" id="servoName" class="form-input" placeholder="e.g. Head Pan">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="servoMin">Min Pulse (µs)</label>
+                        <input type="number" id="servoMin" class="form-input" min="500" max="2500" step="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="servoMax">Max Pulse (µs)</label>
+                        <input type="number" id="servoMax" class="form-input" min="500" max="2500" step="10">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="servoCenter">Center Pulse (µs)</label>
+                    <input type="number" id="servoCenter" class="form-input" min="500" max="2500" step="10">
+                </div>
+                
+                <div class="form-group">
+                    <label for="servoColor">Curve Color</label>
+                    <div class="color-picker-row">
+                        <input type="color" id="servoColor" class="form-color">
+                        <span class="color-hex" id="colorHex">#00d4ff</span>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button class="btn btn-small" onclick="closeServoModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="saveServoSettings()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CONFIG = {
+            numServos: {{ num_servos }},
+            minPulse: {{ min_pulse }},
+            maxPulse: {{ max_pulse }},
+            centerPulse: {{ center_pulse }},
+            servos: {}
+        };
+    </script>
+    <script src="{{ url_for('static', filename='js/editor.js') }}"></script>
+</body>
+</html>
+
