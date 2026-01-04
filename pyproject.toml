@@ -1,0 +1,10 @@
+[project]
+name = "droidrig"
+version = "0.1.0"
+description = "Servo Choreography Editor for Animatronic Robots"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["flask>=3.0", "smbus2>=0.4"]
+
+[project.optional-dependencies]
+audio = ["pydub>=0.25", "mutagen>=1.45"]

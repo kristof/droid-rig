@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DroidRig - Curve Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tektur:wght@400..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/editor.css') }}">
+</head>
+<body>
+    <div class="app">
+        <header>
+            <div class="header-left">
+                <h1>DROIDRIG</h1>
+            </div>
+            <div class="header-center">
+                <button id="playPauseBtn" class="btn-square btn-success" onclick="previewAnimation()" title="Play"><span class="material-icons">play_arrow</span></button>
+                <button class="btn-square btn-danger" onclick="stopAnimation()" title="Stop"><span class="material-icons">stop</span></button>
+            </div>
+            <div class="header-right">
+                <a href="/" class="header-link" title="Back to animations">
+                    <span class="material-icons">arrow_back</span>
+                </a>
+                <button class="btn-square" onclick="openSaveModal()" title="Save animation">
+                    <span class="material-icons">save</span>
+                </button>
+                <div class="status" style="margin-left: 10px;">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Ready</span>
+                </div>
+            </div>
+        </header>
+        
+        <div class="toolbar">
+            <div class="tool-group">
+                <label>Grid Snap:</label>
+                <input type="checkbox" id="gridSnap" checked>
+            </div>
+            <div class="tool-group">
+                <label>Live Preview:</label>
+                <input type="checkbox" id="livePreview">
+            </div>
+            <div class="tool-group">
+                <button class="btn btn-small" onclick="clearAllCurves()">Clear all</button>
+            </div>
+            <div class="tool-group" style="margin-left: auto;">
+                <div class="servo-count-control">
+                    <span class="servo-count-label">Servos:</span>
+                    <button class="servo-count-btn" onclick="changeServoCount(-1)">−</button>
+                    <span id="servoCountDisplay" class="servo-count-value">{{ num_servos }}</span>
+                    <button class="servo-count-btn" onclick="changeServoCount(1)">+</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="editor-container">
+            <div class="timeline-ruler-row">
+                <div class="duration-control">
+                    <input type="number" id="duration" class="duration-input" value="3000" min="500" max="600000" step="100">
+                    <span class="duration-unit">ms</span>
+                </div>
+                <div class="ruler-container">
+                    <canvas id="rulerCanvas"></canvas>
+                </div>
+            </div>
+            <div class="audio-row">
+                <div class="audio-label">
+                    <span>AUDIO</span>
+                    <label class="audio-upload-btn" title="Upload audio file">
+                        <span class="material-icons">upload_file</span>
+                        <input type="file" id="audioFileInput" accept=".wav,.mp3,.ogg,.flac" hidden>
+                    </label>
+                    <button class="audio-clear-btn" id="audioClearBtn" title="Remove audio" style="display: none;">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
+                <div class="audio-container" id="audioContainer">
+                    <canvas id="audioCanvas"></canvas>
+                    <div class="audio-placeholder" id="audioPlaceholder">
+                        <span class="material-icons">music_note</span>
+                        <span>Drop audio file or click upload</span>
+                    </div>
+                    <div class="audio-sync-control" id="audioSyncControl" style="display: none;">
+                        <label title="Adjust if audio is out of sync with servos. Positive = delay servos, Negative = delay audio">
+                            <span class="material-icons">sync</span>
+                            <input type="number" id="audioOffset" value="150" min="-500" max="1000" step="25">
+                            <span>ms</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="annotation-row">
+                <div class="annotation-label">
+                    <span>NOTES</span>
+                </div>
+                <div class="annotation-container">
+                    <canvas id="annotationCanvas"></canvas>
+                </div>
+            </div>
+            <div class="tracks-scroll-area" id="tracksScrollArea">
+                <div class="servo-labels" id="servoLabels">
+                    <!-- Dynamically populated -->
+                </div>
+                <div class="tracks-container">
+                    <canvas id="tracksCanvas"></canvas>
+                    <div class="playhead" id="playhead"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div class="footer-info">
+                <span id="mouseInfo">-</span>
+                <span class="footer-hint" id="selectionHint"></span>
+            </div>
+            <div class="log-mini" id="log"></div>
+        </div>
+    </div>
+    
+    <!-- Annotation Popover -->
+    <div id="annotationPopover" class="annotation-popover">
+        <input type="text" id="annotationInput" class="annotation-input" placeholder="Add note...">
+        <button class="btn-add" onclick="confirmAnnotation()">Add</button>
+    </div>
+    <div id="annotationOverlay" class="annotation-overlay" onclick="cancelAnnotation()"></div>
+    
+    <!-- Save Animation Modal -->
+    <div id="saveModal" class="modal" onclick="if(event.target===this)closeSaveModal()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>SAVE ANIMATION</span>
+                <button class="modal-close" onclick="closeSaveModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="animationName">Animation Name</label>
+                    <input type="text" id="animationName" class="form-input" placeholder="e.g. Wave Hello">
+                </div>
+                
+                <div class="save-info">
+                    <span class="material-icons">info</span>
+                    <span>Saves curves, annotations, and audio reference</span>
+                </div>
+                
+                <div class="form-actions">
+                    <button class="btn btn-small" onclick="closeSaveModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="saveAnimation()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Servo Settings Modal -->
+    <div id="servoModal" class="modal" onclick="if(event.target===this)closeServoModal()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="modalTitle">SERVO SETTINGS</span>
+                <button class="modal-close" onclick="closeServoModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="modalChannel">
+                
+                <div class="form-group">
+                    <label for="servoName">Name / Alias</label>
+                    <input type="text" id="servoName" class="form-input" placeholder="e.g. Head Pan">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="servoMin">Min Pulse (µs)</label>
+                        <input type="number" id="servoMin" class="form-input" min="500" max="2500" step="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="servoMax">Max Pulse (µs)</label>
+                        <input type="number" id="servoMax" class="form-input" min="500" max="2500" step="10">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="servoCenter">Center Pulse (µs)</label>
+                    <input type="number" id="servoCenter" class="form-input" min="500" max="2500" step="10">
+                </div>
+                
+                <div class="form-group">
+                    <label for="servoColor">Curve Color</label>
+                    <div class="color-picker-row">
+                        <input type="color" id="servoColor" class="form-color">
+                        <span class="color-hex" id="colorHex">#00d4ff</span>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button class="btn btn-small" onclick="closeServoModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="saveServoSettings()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // @ts-nocheck
+        // eslint-disable-next-line
+        const CONFIG = {
+            numServos: {{ num_servos }},
+            minPulse: {{ min_pulse }},
+            maxPulse: {{ max_pulse }},
+            centerPulse: {{ center_pulse }},
+            servos: {}
+        };
+    </script>
+    <script src="{{ url_for('static', filename='js/editor.js') }}"></script>
+</body>
+</html>
+
